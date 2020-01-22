@@ -150,7 +150,7 @@ plot(totalWithnss)
 axis(1, at=seq(0, 300, by=25), labels = TRUE)
 
 
-#It seems this dataset can be partitioned into about 40 distinct clusters. I am going to use 12 so for practical reasons.
+#It seems this dataset can be partitioned into about 30 distinct clusters. I am going to use 15 so for practical reasons.
 
 
 fits <- kmeans(scaled.df,15) 
@@ -399,7 +399,7 @@ Team <-Team[order(-Team$`WS/48`),]
 
 ###############
 #merge team in the five spots on each lineup
-##########!!!!!!!!!!!min cluster grouping total mins over 2 years!!!!!!!!!!!!!
+##########!!!!!!!!!!!min cluster grouping total is currently over 100 minutes but can be changed to whatever!!!!!!!!!!!!!
 lineupsum100min<- subset(lineupsum,lineupsum$finalMP>100)
 teambestlineup <- merge(lineupsum100min,Team[,c(2,16,22)], by = "fits$cluster", all = TRUE)
 colnames(teambestlineup)[1] <- "player1cluster"
