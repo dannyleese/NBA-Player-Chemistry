@@ -4,3 +4,4 @@ Predict the best lineup combination for each team based on 15 player clusters an
 2. corresponded each player cluster to all 5-player lineups over the past three seasons
 3. Combined all lineups with the same 5 clusters based on a weighted average of lineup minutes played
 4. Project the best lineup for each team based on the best performing (highest net points) 5 player cluster combinations
+note: Use line 396 to change the team to whatever team you wish. Use the three letter abbreviation of the team. The current team is "MIN."
