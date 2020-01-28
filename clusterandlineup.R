@@ -150,7 +150,7 @@ plot(totalWithnss)
 axis(1, at=seq(0, 300, by=25), labels = TRUE)
 
 
-#It seems this dataset can be partitioned into about 30 distinct clusters. I am going to use 15 so for practical reasons.
+#It seems this dataset can be partitioned into about 40 distinct clusters. I am going to use 12 so for practical reasons.
 
 
 fits <- kmeans(scaled.df,15) 
@@ -393,14 +393,14 @@ clustersandWSper<- merge(FINALCLUSTER, advancedstats2018to2020[,c(6:8,24,31)], b
 clustersandWSper[,19:22]<- clustersandWSper[,19:22] %<>% mutate_if(is.character,as.numeric)
 
 # create list with just team specified players !!!!!!!!!!!!!! CHANGE TO WHATEVER TEAM YOU WISH !!!!!!!!!!!!!!!!
-Team <- subset(clustersandWSper, clustersandWSper$`perpossandadvancedstats$year.x` == 2020 & clustersandWSper$`perpossandadvancedstats$Tm.x`== "MIN" & clustersandWSper$G > 10)
+Team <- subset(clustersandWSper, clustersandWSper$`perpossandadvancedstats$year.x` == 2020 & clustersandWSper$`perpossandadvancedstats$Tm.x`== "TOR" & clustersandWSper$G > 10)
 #sort by Win shares per 48
 Team <-Team[order(-Team$`WS/48`),]
 
 ###############
 #merge team in the five spots on each lineup
-##########!!!!!!!!!!!min cluster grouping total is currently over 100 minutes but can be changed to whatever!!!!!!!!!!!!!
-lineupsum100min<- subset(lineupsum,lineupsum$finalMP>100)
+##########!!!!!!!!!!!min cluster grouping total mins over 100 mins!!!!!!!!!!!!!
+lineupsum100min<- subset(lineupsum,lineupsum$finalMP>50)
 teambestlineup <- merge(lineupsum100min,Team[,c(2,16,22)], by = "fits$cluster", all = TRUE)
 colnames(teambestlineup)[1] <- "player1cluster"
 teambestlineup1<- merge(teambestlineup, Team[,c(2,16,22)], by.x = "fits$cluster.x", by.y = "fits$cluster", all = TRUE)
@@ -418,25 +418,29 @@ result = teambestlineup4[apply(teambestlineup4[,c(23,25,27,29,31)], MARGIN =  1,
 #delete rows with missing player
 result<- result[complete.cases(result), ]
 #sum WS/48 for each lineup
-colnames(result)[28] <- "WS/48.x.1"
-colnames(result)[30] <- "WS/48.y.1"
-colnames(result)[23] <- "player1"
-colnames(result)[25] <- "player2"
-colnames(result)[27] <- "player3"
-colnames(result)[29] <- "player4"
-colnames(result)[31] <- "player5"
+colnames(result)[23] <- "WS/48p1"
+colnames(result)[25] <- "WS/48p2"
+colnames(result)[27] <- "WS/48p3"
+colnames(result)[29] <- "WS/48p4"
+colnames(result)[31] <- "WS/48p5"
+colnames(result)[22] <- "player1"
+colnames(result)[24] <- "player2"
+colnames(result)[26] <- "player3"
+colnames(result)[28] <- "player4"
+colnames(result)[30] <- "player5"
 
-result$WStotal<- result$`WS/48`+result$`WS/48.x`+result$`WS/48.x.1`+result$`WS/48.y`+result$`WS/48.y.1`
+result$WStotal<- result$`WS/48p1`+ result$`WS/48p2`+ result$`WS/48p3` + result$`WS/48p4` + result$`WS/48p5`
 #sort by points
 result<- result %>% arrange(-finalPTS, -WStotal)
 #########
 #create one lineup for each cluster grouping
 singlelineup<- result[!duplicated(result$clustersum),]
-singlelineup<- subset(singlelineup[,c(7:21,23,25,27,29,31)])
+singlelineup<- subset(singlelineup[,c(7:21,22,24,26,28,30)])
 
 #clean results datafram
-resultclean<- subset(result[,c(5,4,3,2,1,7:20,23,25,27,29,31,33)])
+resultclean<- subset(result[,c(5,4,3,2,1,7:20,22,24,26,28,30,32)])
 resultclean$clusters<-  paste(resultclean$player1cluster, resultclean$player2cluster, resultclean$player3cluster, resultclean$player4cluster, resultclean$player5cluster)
 
 #sort cluster data frame
 FINALCLUSTER<- FINALCLUSTER %>% arrange(`fits$cluster`)
+
