@@ -1,4 +1,4 @@
-#install.packages("rvest")
+#install.packages("rJava")
 library("rvest")
 library("plyr")
 library("dplyr")
@@ -7,6 +7,8 @@ library("tidyr")
 library("ggplot2")
 library("data.table")
 library("magrittr")
+library("Rserve")
+
 #########
 #scrape all per 100 possessions stats from basketball reffernece for the 2020 season
 url <- "https://www.basketball-reference.com/leagues/NBA_2020_per_poss.html"
@@ -153,7 +155,7 @@ axis(1, at=seq(0, 300, by=25), labels = TRUE)
 #It seems this dataset can be partitioned into about 40 distinct clusters. I am going to use 12 so for practical reasons.
 
 
-fits <- kmeans(scaled.df,15) 
+fits <- kmeans(scaled.df,20) 
 totalWithnss <- sum(fits$withinss)
 totalWithnss
 
@@ -392,55 +394,88 @@ colnames(FINALCLUSTER)[2] <- "ID"
 clustersandWSper<- merge(FINALCLUSTER, advancedstats2018to2020[,c(6:8,24,31)], by= "ID")
 clustersandWSper[,19:22]<- clustersandWSper[,19:22] %<>% mutate_if(is.character,as.numeric)
 
-# create list with just team specified players !!!!!!!!!!!!!! CHANGE TO WHATEVER TEAM YOU WISH !!!!!!!!!!!!!!!!
-Team <- subset(clustersandWSper, clustersandWSper$`perpossandadvancedstats$year.x` == 2020 & clustersandWSper$`perpossandadvancedstats$Tm.x`== "TOR" & clustersandWSper$G > 10)
-#sort by Win shares per 48
-Team <-Team[order(-Team$`WS/48`),]
-
-###############
-#merge team in the five spots on each lineup
-##########!!!!!!!!!!!min cluster grouping total mins over 100 mins!!!!!!!!!!!!!
-lineupsum100min<- subset(lineupsum,lineupsum$finalMP>50)
-teambestlineup <- merge(lineupsum100min,Team[,c(2,16,22)], by = "fits$cluster", all = TRUE)
-colnames(teambestlineup)[1] <- "player1cluster"
-teambestlineup1<- merge(teambestlineup, Team[,c(2,16,22)], by.x = "fits$cluster.x", by.y = "fits$cluster", all = TRUE)
-colnames(teambestlineup1)[1] <- "player2cluster"
-teambestlineup2<- merge(teambestlineup1, Team[,c(2,16,22)], by.x = "fits$cluster.y", by.y = "fits$cluster", all = TRUE)
-colnames(teambestlineup2)[1] <- "player3cluster"
-teambestlineup3<- merge(teambestlineup2, Team[,c(2,16,22)], by.x = "fits$cluster.x.1", by.y = "fits$cluster", all = TRUE)
-colnames(teambestlineup3)[1] <- "player4cluster"
-teambestlineup4<- merge(teambestlineup3, Team[,c(2,16,22)], by.x = "fits$cluster.y.1", by.y = "fits$cluster", all = TRUE)
-colnames(teambestlineup4)[1] <- "player5cluster"
 
 
-# remove rows with duplicate entries
-result = teambestlineup4[apply(teambestlineup4[,c(23,25,27,29,31)], MARGIN =  1, FUN = function(x) !any(duplicated(x))), ]
-#delete rows with missing player
-result<- result[complete.cases(result), ]
-#sum WS/48 for each lineup
-colnames(result)[23] <- "WS/48p1"
-colnames(result)[25] <- "WS/48p2"
-colnames(result)[27] <- "WS/48p3"
-colnames(result)[29] <- "WS/48p4"
-colnames(result)[31] <- "WS/48p5"
-colnames(result)[22] <- "player1"
-colnames(result)[24] <- "player2"
-colnames(result)[26] <- "player3"
-colnames(result)[28] <- "player4"
-colnames(result)[30] <- "player5"
+teamlist <- c("ATL","BOS","CHO","CHI","CLE","DAL","DEN","DET","GSW","HOU","IND","LAC","LAL","MEM","MIA","MIL","MIN","BRK","NYK","ORL","PHI","PHO","POR","SAS","SAC","OKC","TOR","UTA","NOP","WAS")
+resultclean2<-data.frame()
+resultclean<-data.frame()
 
-result$WStotal<- result$`WS/48p1`+ result$`WS/48p2`+ result$`WS/48p3` + result$`WS/48p4` + result$`WS/48p5`
-#sort by points
-result<- result %>% arrange(-finalPTS, -WStotal)
+
+for(j in teamlist){
+
+  # create list with just team specified players !!!!!!!!!!!!!! CHANGE TO WHATEVER TEAM YOU WISH !!!!!!!!!!!!!!!!
+  Team <- subset(clustersandWSper, clustersandWSper$`perpossandadvancedstats$year.x` == 2020 & clustersandWSper$`perpossandadvancedstats$Tm.x`== j & clustersandWSper$G > 10)
+  #sort by Win shares per 48
+  Team <-Team[order(-Team$`WS/48`),]
+  
+  Team$randoms <- runif(nrow(Team), min=0, max=1)
+  
+  ###############
+  #merge team in the five spots on each lineup
+  ##########!!!!!!!!!!!min cluster grouping total mins over 100 mins!!!!!!!!!!!!!
+  lineupsum100min<- subset(lineupsum,lineupsum$finalMP>100)
+  teambestlineup <- merge(lineupsum100min,Team[,c(2,16,22,23)], by = "fits$cluster", all = TRUE)
+  colnames(teambestlineup)[1] <- "player1cluster"
+  teambestlineup1<- merge(teambestlineup, Team[,c(2,16,22,23)], by.x = "fits$cluster.x", by.y = "fits$cluster", all = TRUE)
+  colnames(teambestlineup1)[1] <- "player2cluster"
+  teambestlineup2<- merge(teambestlineup1, Team[,c(2,16,22,23)], by.x = "fits$cluster.y", by.y = "fits$cluster", all = TRUE)
+  colnames(teambestlineup2)[1] <- "player3cluster"
+  teambestlineup3<- merge(teambestlineup2, Team[,c(2,16,22,23)], by.x = "fits$cluster.x.1", by.y = "fits$cluster", all = TRUE)
+  colnames(teambestlineup3)[1] <- "player4cluster"
+  teambestlineup4<- merge(teambestlineup3, Team[,c(2,16,22,23,17)], by.x = "fits$cluster.y.1", by.y = "fits$cluster", all = TRUE)
+  colnames(teambestlineup4)[1] <- "player5cluster"
+  
+  
+  # remove rows with duplicate entries
+  result = teambestlineup4[apply(teambestlineup4[,c(22,25,28,31,34)], MARGIN =  1, FUN = function(x) !any(duplicated(x))), ]
+  #delete rows with missing player
+  result<- result[complete.cases(result), ]
+  #sum WS/48 for each lineup
+  colnames(result)[23] <- "WS/48p1"
+  colnames(result)[26] <- "WS/48p2"
+  colnames(result)[29] <- "WS/48p3"
+  colnames(result)[32] <- "WS/48p4"
+  colnames(result)[35] <- "WS/48p5"
+  colnames(result)[22] <- "player1"
+  colnames(result)[25] <- "player2"
+  colnames(result)[28] <- "player3"
+  colnames(result)[31] <- "player4"
+  colnames(result)[34] <- "player5"
+  colnames(result)[24] <- "rand1"
+  colnames(result)[27] <- "rand2"
+  colnames(result)[30] <- "rand3"
+  colnames(result)[33] <- "rand4"
+  colnames(result)[36] <- "rand5"
+  
+  result$WStotal<- result$`WS/48p1`+ result$`WS/48p2`+ result$`WS/48p3` + result$`WS/48p4` + result$`WS/48p5`
+  #sort by points
+  result<- result %>% arrange(-finalPTS, -WStotal)
+  
+  #sumrandoms
+  result$randsum<- result$rand1 +result$rand2+result$rand3  +result$rand4 +result$rand5
+  # remove rows with duplicate entries
+  result<- distinct(result,randsum, .keep_all= TRUE)
+  
+  #clean results datafram
+  resultclean<- subset(result[,c(5,4,3,2,1,7:20,22,25,28,31,34,37,38)])
+  resultclean$clusters<-  paste(resultclean$player1cluster, resultclean$player2cluster, resultclean$player3cluster, resultclean$player4cluster, resultclean$player5cluster)
+  
+  resultclean2<- rbind(resultclean2,resultclean)
+}
+
+
 #########
 #create one lineup for each cluster grouping
-singlelineup<- result[!duplicated(result$clustersum),]
-singlelineup<- subset(singlelineup[,c(7:21,22,24,26,28,30)])
+#singlelineup<- result[!duplicated(result$clustersum),]
+#singlelineup<- subset(singlelineup[,c(7:21,22,24,26,28,30)])
 
-#clean results datafram
-resultclean<- subset(result[,c(5,4,3,2,1,7:20,22,24,26,28,30,32)])
-resultclean$clusters<-  paste(resultclean$player1cluster, resultclean$player2cluster, resultclean$player3cluster, resultclean$player4cluster, resultclean$player5cluster)
+#create column of all five players together
+cols<- resultclean2[,20:24]
+resultclean2$players <-  unite(cols, players, sep = " | ")
 
-#sort cluster data frame
-FINALCLUSTER<- FINALCLUSTER %>% arrange(`fits$cluster`)
+table(resultclean2$`perpossandadvancedstats$Tm.x`)
+
+write.csv(resultclean2,"allteamlineups2.csv")
+
+
 
