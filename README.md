@@ -1,7 +1,7 @@
 # NBA-teams-best-lineup
-Predict the best lineup combination for each team based on 15 player clusters and and historical 5-man lineup performance.
-1. Created 15 clusters based on player "rate" statistics over the past three seasons
-2. corresponded each player cluster to all 5-player lineups over the past three seasons
-3. Combined all lineups with the same 5 clusters based on a weighted average of lineup minutes played
-4. Project the best lineup for each team based on the best performing (highest net points) 5 player cluster combinations
-note: The final data frame is "resultclean2"
+
+My approach was to group all similar players in the NBA using K-Means Clustering. I then looked at all 5-player lineup combinations over the past 20 years and looked at  which groups made up each lineup. By determining the performance level of a 5-group combination in a lineup, I could quantify the chemistry of that group mixture. And finally, I fit today’s NBA rosters into the best lineup combinations to see if teams were playing the optimal player personnel.
+Check out my R Shiny app using this link: https://dannyleese.shinyapps.io/Player_Chemistry/
+Check out the full article here: https://medium.com/the-sports-scientist/quantifying-nba-player-chemistry-d6c4fa8f016e
+The R shiny code is in the "shinychemistry.r file.
+If you want to update the CSV files, the code for web scraping and manipulating the data can be found in the perpossandadv.r file.
