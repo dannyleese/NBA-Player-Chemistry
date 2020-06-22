@@ -148,3 +148,65 @@ perpossandadvancedstats$first2letter<-substr(perpossandadvancedstats$first, 1, 2
 perpossandadvancedstats$url<- paste0("https://d2cwpp38twqe55.cloudfront.net/req/202005142/images/players/",perpossandadvancedstats$fiveletter,perpossandadvancedstats$first2letter,"01.jpg")
 perpossandadvancedstats$url<-lapply(perpossandadvancedstats$url, tolower)
 perpossandadvancedstats$url<-as.character(perpossandadvancedstats$url)
+
+write.csv()
+
+###############Lineups##############
+#scrape lineup stats from basketball reffernece for the 2018 season over 24 mins
+alllineups <- data.frame()
+for (i in 2000:2020) {
+  for(j in seq(0,5000,100)){
+    url <-paste0("https://www.basketball-reference.com/play-index/lineup_finder.cgi?request=1&match=single&player_id=&lineup_type=5-man&output=per_poss&year_id=",i,"&is_playoffs=N&team_id=&opp_id=&game_num_min=0&game_num_max=99&game_month=&game_location=&game_result=&c1stat=mp&c1comp=ge&c1val=10&c2stat=&c2comp=&c2val=&c3stat=&c3comp=&c3val=&c4stat=&c4comp=&c4val=&order_by=diff_pts&order_by_asc=&offset=",j,"", sep="")
+    url <-read_html(url)
+    set100lines<- data.frame(url %>% html_nodes(xpath='//*[@id="stats"]') %>% html_table())
+    
+    alllineups<- rbind(alllineups,set100lines)
+  }
+}
+
+
+#change row 1 to be the headers and then delete the original row 1
+colnames(alllineups) <- as.character(unlist(alllineups[1,]))
+alllineups = alllineups[-1, ]
+
+#romove the header rows thrughout the dataframe
+alllineups<-alllineups[!alllineups$Rk == "Rk", ]
+alllineups<-alllineups[!alllineups$Rk == "", ]
+
+
+#change year column to two numbers
+alllineups$year<-gsub('-.*',"",alllineups$Season)
+
+#make numeric
+alllineups[,c(5:21)] %<>% mutate_if(is.character,as.numeric)
+
+alllineups$year<- alllineups$year+1
+alllineups<-alllineups[-c(1888,1382),]
+#put players in their own columns
+setDT(alllineups)[, paste0("Lineup", 1:5) := tstrsplit(Lineup, '\\|')]
+
+#remove any white space from player names
+alllineups$Lineup1 <- gsub("(^\\s+)|(\\s+$)", "", alllineups$Lineup1)
+alllineups$Lineup2 <- gsub("(^\\s+)|(\\s+$)", "", alllineups$Lineup2)
+alllineups$Lineup3 <- gsub("(^\\s+)|(\\s+$)", "", alllineups$Lineup3)
+alllineups$Lineup4 <- gsub("(^\\s+)|(\\s+$)", "", alllineups$Lineup4)
+alllineups$Lineup5 <- gsub("(^\\s+)|(\\s+$)", "", alllineups$Lineup5)
+
+
+#Remove mid spaces from each player
+alllineups$Lineup1<- gsub("(?<=[\\s])\\s*|^\\s+|\\s+$", "", alllineups$Lineup1, perl=TRUE)
+alllineups$Lineup2<- gsub("(?<=[\\s])\\s*|^\\s+|\\s+$", "", alllineups$Lineup2, perl=TRUE)
+alllineups$Lineup3<- gsub("(?<=[\\s])\\s*|^\\s+|\\s+$", "", alllineups$Lineup3, perl=TRUE)
+alllineups$Lineup4<- gsub("(?<=[\\s])\\s*|^\\s+|\\s+$", "", alllineups$Lineup4, perl=TRUE)
+alllineups$Lineup5<- gsub("(?<=[\\s])\\s*|^\\s+|\\s+$", "", alllineups$Lineup5, perl=TRUE)
+
+#create unique ideas for each player within each lineup
+alllineups$player1<- paste(alllineups$Lineup1,alllineups$Tm,alllineups$year)
+alllineups$player2<- paste(alllineups$Lineup2,alllineups$Tm,alllineups$year)
+alllineups$player3<- paste(alllineups$Lineup3,alllineups$Tm,alllineups$year)
+alllineups$player4<- paste(alllineups$Lineup4,alllineups$Tm,alllineups$year)
+alllineups$player5<- paste(alllineups$Lineup5,alllineups$Tm,alllineups$year)
+
+#rename team possessoins in alllineups
+colnames(alllineups)[7]<-"tmposs"
+
