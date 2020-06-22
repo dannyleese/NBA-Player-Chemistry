@@ -1,4 +1,4 @@
-# NBA-teams-best-lineup
+# NBA-Player-Chemistry
 
 My approach was to group all similar players in the NBA using K-Means Clustering. I then looked at all 5-player lineup combinations over the past 20 years and looked at  which groups made up each lineup. By determining the performance level of a 5-group combination in a lineup, I could quantify the chemistry of that group mixture. And finally, I fit today’s NBA rosters into the best lineup combinations to see if teams were playing the optimal player personnel.
 Check out my R Shiny app using this link: https://dannyleese.shinyapps.io/Player_Chemistry/
