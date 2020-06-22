@@ -5,14 +5,19 @@ library("rsconnect")
 library("dplyr")
 library("data.table")
 library("rvest")
-library("tidyr")
+library("paletteer")
+library("gt")
+library("ggiraphExtra")
+library("ggplot2")
+library("tibble")
+library("scales")
 
 
 data<-read.csv("https://raw.githubusercontent.com/dannyleese/NBA-teams-best-lineup/master/perpossandadv.csv", stringsAsFactors=FALSE)
 data[,sapply(data,is.character)] <- sapply(
   data[,sapply(data,is.character)],
   iconv,"WINDOWS-1252","UTF-8")
-names(data)[c(4:9,11,14,15:20,23,44,47:54)]<-c("Player","year","Pos","Age","Tm","G","MP","FG%","3P","3PA","3P%","2P","2PA","2P%","FT%","TS%","ORB%","DRB%","TRB%","AST%","STL%","BLK%","TOV%","USG%")
+names(data)[c(4:9,11,14,15:20,23,44,45,47:54)]<-c("Player","year","Pos","Age","Tm","G","MP","FG%","3P","3PA","3P%","2P","2PA","2P%","FT%","TS%","3PAr","ORB%","DRB%","TRB%","AST%","STL%","BLK%","TOV%","USG%")
 
 
 lineups<-read.csv("https://raw.githubusercontent.com/dannyleese/NBA-teams-best-lineup/master/lineups.csv",stringsAsFactors=FALSE)
@@ -27,12 +32,15 @@ teamlist <- c("ATL","BOS","CHO","CHI","CLE","DAL","DEN","DET","GSW","HOU","IND",
 
 
 ui <- fluidPage(
-  titlePanel("NBA Player Chemistry"),
+  titlePanel("NBA Player Chemistry - Danny Leese"),
+             
   
   sidebarLayout(
     sidebarPanel(h1("Overview"),
+                 a("Danny Leese Twitter", 
+                   href = "https://twitter.com/dannyleese"),
                  
-                 p("This tool allows any user to quantify the chemistry of NBA lineups based on customized attributes. ",h4("Click through the tabs in the ORDERED sequence to complete the process.")," The approach will be to first group all similar players in the NBA using K-Means Clustering, a machine learning algorithm. For example, there will be a group of 3-point shooters, a group of defensive big men, and a group of pass-first guards, etc. We will then look at all 5-player lineup combinations over the past 20 years and see which groups up made each lineup. By determining the performance level of a 5-group combination, we can quantify the chemistry of that group mixture. Finally, we will fit today's NBA rosters into the best lineup combinations to see the optimal player personnel grouping on each team based on chemistry."),
+                 p("This tool allows any user to quantify the chemistry of NBA lineups based on customized attributes. ",h4("Click through the tabs in the ORDERED sequence to complete the process.")," The approach will be to first group all similar players in the NBA using K-Means Clustering, a machine learning algorithm. For example, there will be a group of 3-point shooters, a group of defensive big men, and a group of pass-first guards, etc. We will then look at all 5-player lineup combinations over the past 20 years and see which groups made up each lineup. By determining the performance level of a 5-group combination, we can quantify the chemistry of that group mixture. Finally, we will fit today's NBA rosters into the best lineup combinations to see the optimal player personnel grouping on each team based on chemistry."),
                  p("For a complete explanation check out ",
                    a("my article", 
                      href = "https://medium.com/the-sports-scientist/quantifying-nba-player-chemistry-d6c4fa8f016e?source=friends_link&sk=ef4ae776a0174ed513634885f4ca938d")),
@@ -40,7 +48,7 @@ ui <- fluidPage(
                  h3("Graph:"),
                  p("This graph plots the total within-cluster sum of squares based on the number of clusters. This chart will help you determine the number of clusters you want. The more clusters you have, the more specific each cluster will be."),
                  h3("Selections:"),
-                 p("Create your desired K-Means Clustering characteristics based off the number of clusters and customized categories."),
+                 p("Choose your desired K-Means Clustering characteristics based off the number of clusters and customizable categories."),
                  h3("Player Cluster Output:"),
                  p("This table displays the cluster classification for each player along with their season statistics."),
                  h3("Cluster Averages:"),
@@ -57,6 +65,11 @@ ui <- fluidPage(
     ),
     mainPanel(
       tabsetPanel(type = "tabs",
+                  tabPanel("Cover",
+                           h1("NBA Player Chemistry Tool"),
+                           h3("Read instructions on the left and click through the tabs"),
+                           uiOutput("mycover")),
+                  
                   tabPanel("Graph",
                            uiOutput("myImage")),
         tabPanel("Selections",
@@ -65,7 +78,7 @@ ui <- fluidPage(
                    
                    column(4,
                           numericInput("cluster_number", 
-                                      h3("Select Number of Clusters"), 
+                                      h3("Select Number of Clusters (2:100)"), 
                                       value = 20, min = 0, max = 100)),
                  h3("Choose Categories To Create Clusters:"),
                    
@@ -90,8 +103,7 @@ ui <- fluidPage(
                    ))),
               
         tabPanel("Player Cluster Output",
-                 h3( "Note: The clusters are only based off the categories selected on the previous tab"),
-                 h3( "Note: Wait up to 6 secods for the table to load or relaod"),
+                 h3( "Note: Wait up to 6 secods for the table to load or reload"),
                  fluidRow( tags$head(tags$style(
                    HTML("input[type='search']:disabled {visibility:hidden}")
                  ))),
@@ -99,9 +111,15 @@ ui <- fluidPage(
                    DT::dataTableOutput("mytable1")
                  )),
         tabPanel("Cluster Averages",
-                 #h3("This table displays the cluster mean statistics"),
+                 h3( "Note: With several clusters, this table will take a few seconds to load"),
                  fluidRow(
-                   DT::dataTableOutput("mytable2")
+                   #DT::dataTableOutput("mytable2")
+                   column(8,
+                          gt_output(outputId = "mytable2")),
+                   column(4,
+                          uiOutput("secondSelection"),
+                          fluidRow( plotOutput("plot2")))
+                         
                  )),
         tabPanel("Lineups",
                  #h3("This table displays the per 100 possessions statistics of each lineup"),
@@ -145,16 +163,16 @@ ui <- fluidPage(
                                       choices = data[data$year==2020,"Player"], selected = 1)),
                    column(2,
                           selectInput("player2", h5("Player 2:"),
-                                      choices = data[data$year==2020,"Player"], selected = 1)),
+                                      choices = data[data$year==2020,"Player"], selected = "Chris Paul")),
                    column(2,
                           selectInput("player3", h5("Player 3:"),
-                                      choices = data[data$year==2020,"Player"], selected = 1)),
+                                      choices = data[data$year==2020,"Player"], selected = "Kyle Lowry")),
                    column(2,
                           selectInput("player4", h5("Player 4:"),
-                                      choices = data[data$year==2020,"Player"], selected = 1)),
+                                      choices = data[data$year==2020,"Player"], selected = "Kristaps Porzingis")),
                    column(2,
                           selectInput("player5", h5("Player 5:"),
-                                      choices = data[data$year==2020,"Player"], selected = 1))),
+                                      choices = data[data$year==2020,"Player"], selected = "RJ Barrett"))),
                  fluidRow(
                    column(2,
                           uiOutput("img1")),
@@ -178,6 +196,9 @@ server <- function(input, output) {
   output$myImage <- renderUI({
     img(src ="https://raw.githubusercontent.com/dannyleese/NBA-teams-best-lineup/master/Withinss.png")
   })
+  output$mycover <- renderUI({
+    img(src ="https://clutchpoints.com/wp-content/uploads/2019/08/THUMBNAIL_077-3.jpg", height="90%", width="90%")
+  })
   
   output$img1 <- renderUI({
     img(src =data[data$Player==input$player1 & data$year==2020,"url" ])
@@ -195,18 +216,24 @@ server <- function(input, output) {
     img(src =data[data$Player==input$player5 & data$year==2020,"url" ])
   })
     
-
   
 
     output$mytable1 <- DT::renderDataTable({
+      
       normalize <- function(x) {
         return ((x - min(x)) / (max(x) - min(x)))
-      }
-      
+      }  
+
       scaled.df<-data[,c(input$checka,input$checkb)]
       
       scaled.dfreal <- as.data.frame(lapply(scaled.df, normalize))
       fits <- kmeans(scaled.dfreal,input$cluster_number) 
+      #create new dataframe with just chosen columns *** (all with *** mean addded for this purpose)
+      cols<-c(input$checka,input$checkb)
+      FINALCLUSTERexact<-cbind(fits$cluster,data[,c(4,8,5,7)])
+      FINALCLUSTERexact<- cbind(FINALCLUSTERexact,data[,cols])
+      names(FINALCLUSTERexact)[1]<- "V2"
+      #***
       FINALCLUSTER<- cbind(fits$cluster,data)
       FINALCLUSTER[,c(2:4,36:43,64:67,69:70)]<-NULL
       names(FINALCLUSTER)[1]<- "V2"
@@ -216,20 +243,61 @@ server <- function(input, output) {
       df2$uniquecluster <- runif(nrow(df2), min = 0, max = 100)
       FINALCLUSTER<- merge(FINALCLUSTER, df2[,c(1,3)], by= "V2", all= TRUE)
       FINALCLUSTER<-FINALCLUSTER[order(FINALCLUSTER$V2,FINALCLUSTER$Player),]
-      
-      output$mytable2 <- DT::renderDataTable({
-        meancluster<-aggregate(FINALCLUSTER[,c(7,9:52)], list(FINALCLUSTER[,1]), mean)
-        meancluster$count<-table(FINALCLUSTER[,1])
+      #create new dataframe with just chosen columns ***
+      FINALCLUSTERexact<- merge(FINALCLUSTERexact, df2[,c(1,3)], by= "V2", all= TRUE)
+      FINALCLUSTERexact<-FINALCLUSTERexact[order(FINALCLUSTERexact$V2),]
+      ##***
+
+      #output$mytable2 <- DT::renderDataTable({
+        #meancluster<-aggregate(FINALCLUSTER[,c(7,9:52)], list(FINALCLUSTER[,1]), mean)
+        #meancluster$count<-table(FINALCLUSTER[,1])
+        meancluster<-aggregate(FINALCLUSTERexact[,c(-2,-3,-4,-5)], list(FINALCLUSTERexact[,1]), mean)
+        meancluster$uniquecluster<-NULL
+        meancluster$V2<-NULL
+        meancluster <- meancluster[, !duplicated(colnames(meancluster))]
+        meancluster$count<-table(FINALCLUSTERexact[,1])
         meancluster <- meancluster %>%
           mutate_if(is.numeric, round, digits = 2)
         colnames(meancluster)[1]<-"Cluster"
-        DT::datatable(meancluster,rownames = FALSE,
-                      extensions = "FixedColumns",
-                      options = list(
-                        paging = TRUE, searching = TRUE, info = FALSE, fixedHeader=FALSE,
-                        sort = TRUE, scrollX = TRUE,scrollY = "400px", fixedColumns = list(leftColumns = 1),
-                        pageLength = 100, autoWidth = TRUE))
-      })
+        
+        # DT::datatable(meancluster,rownames = FALSE,
+        #               extensions = "FixedColumns",
+        #               options = list(
+        #                 paging = TRUE, searching = TRUE, info = FALSE, fixedHeader=FALSE,
+        #                 sort = TRUE, scrollX = TRUE,scrollY = "400px", fixedColumns = list(leftColumns = 1),
+        #                 pageLength = 100, autoWidth = TRUE))%>%
+        #})
+       
+        output$mytable2 <-render_gt({
+              meancluster  %>% 
+                gt() %>% 
+                data_color(columns=c(2:(ncol(meancluster)-1)),
+                           colors = scales::col_numeric(
+                             palette = c(
+                               "red", "white", "green"),
+                             domain = NULL))
+            })
+          
+              # ),width = px(700))
+        
+        output$secondSelection <- renderUI({
+          selectInput("cluster_select", "Select Cluster:",
+                      choices=as.numeric(meancluster[,"Cluster"]))
+        })
+      
+      
+        output$plot2<-renderPlot({
+          meanclusterscaled <- as.data.frame(lapply(meancluster[,c(2:ncol(meancluster))], normalize))
+          meanclusterscaled <- cbind(meancluster[,1],meanclusterscaled)
+          colnames(meanclusterscaled)[c(1:(ncol(meanclusterscaled)-1))]<- names(meancluster[c(1:(ncol(meancluster)-1))])
+          colnames(meanclusterscaled)[ncol(meanclusterscaled)]<-"Count"
+          meanclusterscaled2<-meanclusterscaled[input$cluster_select,]
+          ggRadar(meanclusterscaled2, aes(group = Cluster), rescale = FALSE)+
+            ggtitle(paste("Cluster", input$cluster_select, "Radar PLot")) +
+          theme(
+            legend.position = 'none')
+
+          })
       
       #create new dataframe with each cluster and new Unique ID
       #create this dataframe 5 times and merge all dataframes with main dataframe
@@ -304,7 +372,7 @@ server <- function(input, output) {
       
       
       output$mytable3 <- DT::renderDataTable({
-        colnames(mergeData5)[c(1,28)]<-c("ID","MP")
+        colnames(mergeData5)[c(1,28,42)]<-c("ID","MP","Net PTS")
         # mergeData5 <- mergeData5 %>%
         #   mutate_if(is.numeric, round, digits = 5)
         DT::datatable(mergeData5[,c(1,25,24,65,43,42,27,28)],rownames = FALSE,options = list(
@@ -316,7 +384,7 @@ server <- function(input, output) {
       output$mytable4 <- DT::renderDataTable({
         # lineupsum <- lineupsum %>%
         #   mutate_if(is.numeric, round, digits = 5)
-        colnames(lineupsum)[c(1,3)]<-c("ID","MP")
+        colnames(lineupsum)[c(1,3,15,2)]<-c("ID","MP","Net PTS","G")
         DT::datatable(lineupsum[,c(1,21,15,2,3)],rownames = FALSE,options = list(
           scrollY = "400px",columnDefs = list(list(className = 'dt-center', targets = 0:4)),
           pageLength = 1000, autoWidth = TRUE))%>% formatRound(c(3), 2)
@@ -408,7 +476,7 @@ server <- function(input, output) {
         
         # resultclean2 <- resultclean2 %>%
         #   mutate_if(is.numeric, round, digits = 5)
-        colnames(resultclean2)[6]<-"ID"
+        colnames(resultclean2)[c(6,8)]<-c("ID","Net PTS")
         DT::datatable(resultclean2[,c(6,17,8,10:14)],rownames = FALSE,options = list(
             scrollY = "400px",columnDefs = list(list(className = 'dt-center', targets = 0:4)),
             pageLength = 1000, autoWidth = TRUE))%>% formatRound(c(3), 2)
@@ -437,22 +505,26 @@ server <- function(input, output) {
           img(src =FINALCLUSTER2020[FINALCLUSTER2020$Player==input$player5 & FINALCLUSTER2020$year==2020,"url" ])
         })
         
+        colnames(lineupsum)[c(15,4,2,3)]<-c("Net PTS", "Pace","G","MP")
         DT::datatable(lineupsum[lineupsum$ID==value,c(1,21,15,4,2,3)],rownames = FALSE,options = list(
-          autoWidth = TRUE,dom = 't', columnDefs = list(list(className = 'dt-center', targets = 0:4))))%>% formatRound(c(3), 2)
+          autoWidth = TRUE,dom = 't', columnDefs = list(list(className = 'dt-center', targets = 0:4))))%>% formatRound(c(3,4), 2)
       })
 
-      FINALCLUSTERclean<-FINALCLUSTER %>% select(1:2,4,6, everything())
-      colnames(FINALCLUSTERclean) [1]<-"Cluster"
-      DT::datatable(FINALCLUSTERclean[,c(-53,-54,-55,-56,-57,-58,-59,-60)],rownames = FALSE, filter = "top",
+      #FINALCLUSTERclean<-FINALCLUSTER %>% select(1:2,4,6, everything())
+      #colnames(FINALCLUSTERclean) [1]<-"Cluster"
+      colnames(FINALCLUSTERexact) [1]<-"Cluster"
+      FINALCLUSTERexact$uniquecluster<-NULL
+      FINALCLUSTERexact <- FINALCLUSTERexact[, !duplicated(colnames(FINALCLUSTERexact))]
+      #DT::datatable(FINALCLUSTERclean[,c(-53,-54,-55,-56,-57,-58,-59,-60)],rownames = FALSE, filter = "top",
+      DT::datatable(FINALCLUSTERexact,rownames = FALSE, filter = "top",
                     options = list(
                       paging = TRUE, searching = TRUE, fixedHeader=FALSE,
                       sort = TRUE, scrollX = TRUE, scrolly="200px", columnDefs = list(list(
-                        targets = c(6:51), searchable = FALSE
+                        targets = c(5:(ncol(FINALCLUSTERexact)-1)), searchable = FALSE
                       )), pageLength = 100, autoWidth = TRUE))
       
    })
-     
-    
+
 }
 
 shinyApp(ui, server)
