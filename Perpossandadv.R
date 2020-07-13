@@ -34,6 +34,20 @@ perpossstats2000to2020<-perpossstats2000to20201
 #remove header columns throughtout dataset
 perpossstats2000to2020<-perpossstats2000to2020[!perpossstats2000to2020$Rk == "Rk", ]
 
+#scrape all the ID's of each player
+perpossstats2000to2020ID<- data.table()
+
+for(j in 2000:2020){
+  for(i in 1){
+    url <-paste0("https://www.basketball-reference.com/leagues/NBA_",j,"_per_poss.html", sep="")
+    url <-read_html(url)
+    statsbyyear<- data.frame(url %>% html_nodes(xpath='//*[@id="per_poss_stats"]/tbody/tr[",i,"]/td[1]/a') %>% html_attr("href"))
+    colnames(statsbyyear)[1]<-"ID"
+    perpossstats2000to2020ID<- rbind(perpossstats2000to2020ID,statsbyyear)
+  }
+}
+
+perpossstats2000to2020<-cbind(perpossstats2000to2020,perpossstats2000to2020ID)
 
 #remove columns that are completely empty
 perpossstats2000to2020 <- Filter(function(x)!all(is.na(x)), perpossstats2000to2020)
@@ -144,8 +158,10 @@ perpossandadvancedstats$player2 <- gsub("\\.", "",perpossandadvancedstats$player
 perpossandadvancedstats<-separate(perpossandadvancedstats, player2, into = c("first", "last"), sep = " (?=[^ ]+$)")
 perpossandadvancedstats$firstletter<-substr(perpossandadvancedstats$last, 1, 1)
 perpossandadvancedstats$fiveletter<-substr(perpossandadvancedstats$last, 1, 5)
-perpossandadvancedstats$first2letter<-substr(perpossandadvancedstats$first, 1, 2)
-perpossandadvancedstats$url<- paste0("https://d2cwpp38twqe55.cloudfront.net/req/202005142/images/players/",perpossandadvancedstats$fiveletter,perpossandadvancedstats$first2letter,"01.jpg")
+perpossandadvancedstats<-perpossandadvancedstats %>% select(1:33,35:73,ID)
+perpossandadvancedstats$ID = substr(perpossandadvancedstats$ID,1,nchar(perpossandadvancedstats$ID)-4)
+substring(perpossandadvancedstats$ID, 9,9 ) <- ""
+perpossandadvancedstats$url<- paste0("https://d2cwpp38twqe55.cloudfront.net/req/202005142/images",perpossandadvancedstats$ID,"jpg")
 perpossandadvancedstats$url<-lapply(perpossandadvancedstats$url, tolower)
 perpossandadvancedstats$url<-as.character(perpossandadvancedstats$url)
 
